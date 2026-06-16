@@ -686,7 +686,8 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   Widget _makeMrtdDataWidget(
       {required String header,
       required String collapsedText,
-      required dataText}) {
+      required dataText,
+      Widget? extraWidget}) {
     return ExpandablePanel(
         theme: const ExpandableThemeData(
           headerAlignment: ExpandablePanelHeaderAlignment.center,
@@ -703,6 +704,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (extraWidget != null) extraWidget,
                   PlatformTextButton(
                     child: Text('Copy'),
                     onPressed: () =>
@@ -760,10 +762,26 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     }
 
     if (_mrtdData!.dg2 != null) {
+      Widget? imageWidget;
+      if (_mrtdData!.dg2!.imageData != null) {
+        if (_mrtdData!.dg2!.imageType == ImageType.jpeg) {
+          imageWidget = Image.memory(_mrtdData!.dg2!.imageData!);
+        } else {
+          imageWidget = const Padding(
+            padding: EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              'Image is in JPEG2000 format (unsupported natively)',
+              style: TextStyle(color: Colors.red),
+            ),
+          );
+        }
+      }
+
       list.add(_makeMrtdDataWidget(
           header: 'EF.DG2',
           collapsedText: '',
-          dataText: _mrtdData!.dg2!.toBytes().hex()));
+          dataText: _mrtdData!.dg2!.toBytes().hex(),
+          extraWidget: imageWidget));
     }
 
     if (_mrtdData!.dg3 != null) {
