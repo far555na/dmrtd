@@ -890,13 +890,20 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                             _buildForm(context),
                             SizedBox(height: 20),
                             PlatformElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
+                              onPressed: () async {
+                                final result = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => const MrzScannerScreen(),
                                   ),
                                 );
+                                if (result != null && result is MRZ) {
+                                  setState(() {
+                                    _docNumber.text = result.documentNumber;
+                                    _dob.text = DateFormat.yMd().format(result.dateOfBirth);
+                                    _doe.text = DateFormat.yMd().format(result.dateOfExpiry);
+                                  });
+                                }
                               },
                               child: PlatformText('Scan MRZ (Camera)'),
                             ),

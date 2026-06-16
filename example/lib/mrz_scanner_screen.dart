@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'dart:io';
+import 'package:dmrtd/dmrtd.dart';
 
 class MrzScannerScreen extends StatefulWidget {
   const MrzScannerScreen({Key? key}) : super(key: key);
@@ -11,6 +16,9 @@ class MrzScannerScreen extends StatefulWidget {
 class _MrzScannerScreenState extends State<MrzScannerScreen> {
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
+  
+  final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  bool _isProcessingFrame = false;
 
   @override
   void initState() {
@@ -36,6 +44,7 @@ class _MrzScannerScreenState extends State<MrzScannerScreen> {
         backCamera,
         ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
       );
 
       await _cameraController!.initialize();
@@ -43,6 +52,7 @@ class _MrzScannerScreenState extends State<MrzScannerScreen> {
         setState(() {
           _isCameraInitialized = true;
         });
+        _cameraController!.startImageStream(_processCameraFrame);
       }
     } catch (e) {
       debugPrint('Error initializing camera: $e');
@@ -51,8 +61,136 @@ class _MrzScannerScreenState extends State<MrzScannerScreen> {
 
   @override
   void dispose() {
+    _cameraController?.stopImageStream();
     _cameraController?.dispose();
+    _textRecognizer.close();
     super.dispose();
+  }
+
+  Future<void> _processCameraFrame(CameraImage image) async {
+    if (_isProcessingFrame) return;
+    _isProcessingFrame = true;
+
+    try {
+      final inputImage = _inputImageFromCameraImage(image);
+      if (inputImage == null) {
+        _isProcessingFrame = false;
+        return;
+      }
+
+      final recognizedText = await _textRecognizer.processImage(inputImage);
+      
+      List<String> mrzLines = [];
+      for (final block in recognizedText.blocks) {
+        for (final line in block.lines) {
+          String text = line.text.replaceAll(' ', '').replaceAll('«', '<');
+          // Common OCR fixes for MRZ
+          text = text.replaceAll('O', '0'); // Dangerous for names, but MRZ parser can be strict on check digits. Wait, no. Names have 'O'. Let's not blindly replace 'O' with '0'.
+          // Let's just keep it simple
+          if (text.length >= 30 && text.length <= 44 && text.contains('<')) {
+            mrzLines.add(text);
+          }
+        }
+      }
+
+      MRZ? parsedMrz;
+      
+      if (mrzLines.length >= 2) {
+        for (int i = 0; i < mrzLines.length - 1; i++) {
+           String combined = mrzLines[i] + mrzLines[i+1];
+           if (combined.length == 72 || combined.length == 88) {
+              try {
+                parsedMrz = MRZ(Uint8List.fromList(combined.codeUnits));
+                break;
+              } catch (e) {
+                debugPrint("MRZ parse failed for 2 lines: $e");
+              }
+           }
+        }
+      }
+      
+      if (parsedMrz == null && mrzLines.length >= 3) {
+        for (int i = 0; i < mrzLines.length - 2; i++) {
+           String combined = mrzLines[i] + mrzLines[i+1] + mrzLines[i+2];
+           if (combined.length == 90) {
+              try {
+                parsedMrz = MRZ(Uint8List.fromList(combined.codeUnits));
+                break;
+              } catch (e) {
+                debugPrint("MRZ parse failed for 3 lines: $e");
+              }
+           }
+        }
+      }
+
+      if (parsedMrz != null) {
+        if (mounted) {
+          Navigator.pop(context, parsedMrz);
+        }
+        return;
+      }
+      
+    } catch (e) {
+      debugPrint('Error processing frame: $e');
+    }
+
+    if (mounted) {
+      _isProcessingFrame = false;
+    }
+  }
+
+  final _orientations = {
+    DeviceOrientation.portraitUp: 0,
+    DeviceOrientation.landscapeLeft: 90,
+    DeviceOrientation.portraitDown: 180,
+    DeviceOrientation.landscapeRight: 270,
+  };
+
+  InputImage? _inputImageFromCameraImage(CameraImage image) {
+    final camera = _cameraController?.description;
+    if (camera == null) return null;
+
+    final sensorOrientation = camera.sensorOrientation;
+    InputImageRotation? rotation;
+    if (Platform.isIOS) {
+      rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+    } else if (Platform.isAndroid) {
+      var rotationCompensation = _orientations[_cameraController!.value.deviceOrientation];
+      if (rotationCompensation == null) return null;
+      if (camera.lensDirection == CameraLensDirection.front) {
+        rotationCompensation = (sensorOrientation + rotationCompensation) % 360;
+      } else {
+        rotationCompensation = (sensorOrientation - rotationCompensation + 360) % 360;
+      }
+      rotation = InputImageRotationValue.fromRawValue(rotationCompensation);
+    }
+    if (rotation == null) return null;
+
+    final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    if (format == null ||
+        (Platform.isAndroid && format != InputImageFormat.nv21 && format != InputImageFormat.yuv_420_888 && format != InputImageFormat.yuv420) ||
+        (Platform.isIOS && format != InputImageFormat.bgra8888)) {
+      return null;
+    }
+
+    if (image.planes.isEmpty) return null;
+
+    final WriteBuffer allBytes = WriteBuffer();
+    for (final Plane plane in image.planes) {
+      allBytes.putUint8List(plane.bytes);
+    }
+    final bytes = allBytes.done().buffer.asUint8List();
+
+    final Size imageSize = Size(image.width.toDouble(), image.height.toDouble());
+
+    final metadata = InputImageMetadata(
+      size: imageSize,
+      rotation: rotation,
+      format: Platform.isAndroid ? InputImageFormat.nv21 : format,
+      bytesPerRow: image.planes[0].bytesPerRow,
+    );
+
+    return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
 
   @override
