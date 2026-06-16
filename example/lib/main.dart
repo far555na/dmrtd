@@ -19,6 +19,8 @@ import 'package:intl/intl.dart';
 
 import 'package:dmrtd/src/proto/ecdh_pace.dart';
 
+import 'mrz_scanner_screen.dart';
+
 class MrtdData {
   EfCardAccess? cardAccess;
   EfCardSecurity? cardSecurity;
@@ -886,6 +888,18 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                             _buildForm(context),
+                            SizedBox(height: 20),
+                            PlatformElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const MrzScannerScreen(),
+                                  ),
+                                );
+                              },
+                              child: PlatformText('Scan MRZ (Camera)'),
+                            ),
                             SizedBox(height: 20),
                             PlatformElevatedButton(
                               // btn Read MRTD
