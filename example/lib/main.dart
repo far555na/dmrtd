@@ -132,6 +132,20 @@ String formatMRZ(final MRZ mrz) {
       "  add. data: ${mrz.optionalData2}";
 }
 
+bool compareMRZ(MRZ mrz1, MRZ mrz2) {
+  return mrz1.documentNumber == mrz2.documentNumber &&
+         mrz1.dateOfBirth == mrz2.dateOfBirth &&
+         mrz1.dateOfExpiry == mrz2.dateOfExpiry &&
+         mrz1.documentCode == mrz2.documentCode &&
+         mrz1.country == mrz2.country &&
+         mrz1.nationality == mrz2.nationality &&
+         mrz1.firstName == mrz2.firstName &&
+         mrz1.lastName == mrz2.lastName &&
+         mrz1.gender == mrz2.gender &&
+         mrz1.optionalData == mrz2.optionalData &&
+         mrz1.optionalData2 == mrz2.optionalData2;
+}
+
 String formatDG15(final EfDG15 dg15) {
   var str = "EF.DG15:\n"
       "  AAPublicKey\n"
@@ -213,6 +227,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   bool _checkBoxPACE = false;
 
   MrtdData? _mrtdData;
+  MRZ? _scannedMRZ;
   // Cached DG2 image bytes for face verification (JPEG or decoded JPEG).
   Uint8List? _dg2ImageBytes;
 
@@ -799,10 +814,27 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     }
 
     if (_mrtdData!.dg1 != null) {
+      Widget? extraWidget;
+      if (_scannedMRZ != null) {
+        final dg1Mrz = _mrtdData!.dg1!.mrz;
+        final isMatch = compareMRZ(_scannedMRZ!, dg1Mrz);
+        extraWidget = Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            isMatch ? '✅ MRZ matches DG1' : '❌ MRZ does NOT match DG1',
+            style: TextStyle(
+              color: isMatch ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      }
+
       list.add(_makeMrtdDataWidget(
           header: 'EF.DG1',
           collapsedText: '',
-          dataText: formatMRZ(_mrtdData!.dg1!.mrz)));
+          dataText: formatMRZ(_mrtdData!.dg1!.mrz),
+          extraWidget: extraWidget));
     }
 
     if (_mrtdData!.dg2 != null) {
@@ -987,6 +1019,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                                 );
                                 if (result != null && result is MRZ) {
                                   setState(() {
+                                    _scannedMRZ = result;
                                     _docNumber.text = result.documentNumber;
                                     _dob.text = DateFormat.yMd().format(result.dateOfBirth);
                                     _doe.text = DateFormat.yMd().format(result.dateOfExpiry);
