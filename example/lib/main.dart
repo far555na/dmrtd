@@ -774,6 +774,65 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                 ])));
   }
 
+  Widget _buildMatchRow(String label, bool isMatch) {
+    return Row(
+      children: [
+        Icon(isMatch ? Icons.check_circle : Icons.cancel, 
+             color: isMatch ? Colors.green : Colors.red, size: 16),
+        SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 14)),
+      ],
+    );
+  }
+
+  Widget _buildMRZComparisonWidget(MRZ mrz1, MRZ mrz2) {
+    bool docNumMatch = mrz1.documentNumber == mrz2.documentNumber;
+    bool dobMatch = mrz1.dateOfBirth == mrz2.dateOfBirth;
+    bool doeMatch = mrz1.dateOfExpiry == mrz2.dateOfExpiry;
+    bool codeMatch = mrz1.documentCode == mrz2.documentCode;
+    bool countryMatch = mrz1.country == mrz2.country;
+    bool natMatch = mrz1.nationality == mrz2.nationality;
+    bool firstMatch = mrz1.firstName == mrz2.firstName;
+    bool lastMatch = mrz1.lastName == mrz2.lastName;
+    bool genderMatch = mrz1.gender == mrz2.gender;
+    bool optMatch = mrz1.optionalData == mrz2.optionalData;
+    bool opt2Match = mrz1.optionalData2 == mrz2.optionalData2;
+
+    bool allMatch = docNumMatch && dobMatch && doeMatch && codeMatch &&
+                    countryMatch && natMatch && firstMatch && lastMatch &&
+                    genderMatch && optMatch && opt2Match;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('MRZ vs DG1 Comparison', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        SizedBox(height: 8),
+        _buildMatchRow('Document Number', docNumMatch),
+        _buildMatchRow('Date of Birth', dobMatch),
+        _buildMatchRow('Date of Expiry', doeMatch),
+        _buildMatchRow('Document Code', codeMatch),
+        _buildMatchRow('Country', countryMatch),
+        _buildMatchRow('Nationality', natMatch),
+        _buildMatchRow('First Name', firstMatch),
+        _buildMatchRow('Last Name', lastMatch),
+        _buildMatchRow('Gender', genderMatch),
+        _buildMatchRow('Optional Data', optMatch),
+        if (mrz1.optionalData2 != null || mrz2.optionalData2 != null)
+          _buildMatchRow('Optional Data 2', opt2Match),
+        SizedBox(height: 12),
+        Text(
+          allMatch ? '✅ FINAL RESULT: MATCH' : '❌ FINAL RESULT: MISMATCH',
+          style: TextStyle(
+            color: allMatch ? Colors.green : Colors.red,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        SizedBox(height: 16),
+      ],
+    );
+  }
+
   List<Widget> _mrtdDataWidgets() {
     List<Widget> list = [];
     if (_mrtdData == null) return list;
@@ -817,16 +876,9 @@ class _MrtdHomePageState extends State<MrtdHomePage>
       Widget? extraWidget;
       if (_scannedMRZ != null) {
         final dg1Mrz = _mrtdData!.dg1!.mrz;
-        final isMatch = compareMRZ(_scannedMRZ!, dg1Mrz);
         extraWidget = Padding(
           padding: const EdgeInsets.only(bottom: 8.0),
-          child: Text(
-            isMatch ? '✅ MRZ matches DG1' : '❌ MRZ does NOT match DG1',
-            style: TextStyle(
-              color: isMatch ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: _buildMRZComparisonWidget(_scannedMRZ!, dg1Mrz),
         );
       }
 
