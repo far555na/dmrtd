@@ -766,11 +766,37 @@ class _MrtdHomePageState extends State<MrtdHomePage>
       if (_mrtdData!.dg2!.imageData != null) {
         if (_mrtdData!.dg2!.imageType == ImageType.jpeg) {
           imageWidget = Image.memory(_mrtdData!.dg2!.imageData!);
+        } else if (_mrtdData!.dg2!.imageType == ImageType.jpeg2000) {
+          imageWidget = FutureBuilder<dynamic>(
+            future: const MethodChannel('dmrtd/image_decoder').invokeMethod('decodeJp2k', {
+              'bytes': _mrtdData!.dg2!.imageData!,
+            }),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 8.0),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              } else if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text(
+                    'Error decoding JP2K image: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              } else if (snapshot.hasData) {
+                return Image.memory(snapshot.data as Uint8List);
+              } else {
+                return const SizedBox.shrink();
+              }
+            },
+          );
         } else {
           imageWidget = const Padding(
             padding: EdgeInsets.only(bottom: 8.0),
             child: Text(
-              'Image is in JPEG2000 format (unsupported natively)',
+              'Unsupported image format',
               style: TextStyle(color: Colors.red),
             ),
           );
