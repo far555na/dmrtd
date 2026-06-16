@@ -20,6 +20,8 @@ import 'package:intl/intl.dart';
 import 'package:dmrtd/src/proto/ecdh_pace.dart';
 
 import 'mrz_scanner_screen.dart';
+import 'selfie_capture_screen.dart';
+import 'face_verification_screen.dart';
 
 class MrtdData {
   EfCardAccess? cardAccess;
@@ -211,6 +213,8 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   bool _checkBoxPACE = false;
 
   MrtdData? _mrtdData;
+  // Cached DG2 image bytes for face verification (JPEG or decoded JPEG).
+  Uint8List? _dg2ImageBytes;
 
   final NfcProvider _nfc = NfcProvider();
 
@@ -396,6 +400,21 @@ class _MrtdHomePageState extends State<MrtdHomePage>
 
         if (mrtdData.com!.dgTags.contains(EfDG2.TAG)) {
           mrtdData.dg2 = await passport.readEfDG2();
+          if (mrtdData.dg2?.imageData != null) {
+            if (mrtdData.dg2?.imageType == ImageType.jpeg) {
+              _dg2ImageBytes = mrtdData.dg2?.imageData;
+            } else if (mrtdData.dg2?.imageType == ImageType.jpeg2000) {
+              try {
+                final dynamic decoded = await const MethodChannel('dmrtd/image_decoder')
+                    .invokeMethod('decodeJp2k', {
+                  'bytes': mrtdData.dg2!.imageData!,
+                });
+                _dg2ImageBytes = decoded as Uint8List?;
+              } catch (e) {
+                _log.warning("Failed to decode JP2K image for face matching: $e");
+              }
+            }
+          }
         }
 
         // To read DG3 and DG4 session has to be established with CVCA certificate (not supported).
@@ -509,6 +528,31 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     } on Exception catch (e) {
       _log.error("Read MRTD error: $e");
     }
+  }
+
+  /// Opens the selfie camera, then — if a selfie was captured — pushes the
+  /// [FaceVerificationScreen] with the DG2 passport photo and the selfie.
+  Future<void> _launchFaceVerification() async {
+    final dg2Bytes = _dg2ImageBytes;
+    if (dg2Bytes == null) return;
+
+    // Step 1: capture selfie.
+    final selfieBytes = await Navigator.push<Uint8List>(
+      context,
+      MaterialPageRoute(builder: (_) => const SelfieCaptureScreen()),
+    );
+    if (selfieBytes == null || !mounted) return;
+
+    // Step 2: run matching and display results.
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FaceVerificationScreen(
+          passportImageBytes: dg2Bytes,
+          selfieBytes: selfieBytes,
+        ),
+      ),
+    );
   }
 
   void _readMRTDOld() async {
@@ -958,6 +1002,15 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                               child: PlatformText(
                                   _isReading ? 'Reading ...' : 'Read Passport'),
                             ),
+                            // ── Verify Face button ─────────────────────────────
+                            if (_dg2ImageBytes != null) ...
+                            [
+                              SizedBox(height: 12),
+                              PlatformElevatedButton(
+                                onPressed: _launchFaceVerification,
+                                child: PlatformText('Verify Face (1:1 Match)'),
+                              ),
+                            ],
                             SizedBox(height: 20),
                             Row(children: <Widget>[
                               Text('NFC available:',
