@@ -70,9 +70,9 @@ final Map<DgTag, String> dgTagToString = {
 
 Widget _makeMrtdAccessDataWidget(
     {required String header,
-      required String collapsedText,
-      required bool isPACE,
-      required bool isDBA}) {
+    required String collapsedText,
+    required bool isPACE,
+    required bool isDBA}) {
   return ExpandablePanel(
       theme: const ExpandableThemeData(
         headerAlignment: ExpandablePanelHeaderAlignment.center,
@@ -86,19 +86,18 @@ Widget _makeMrtdAccessDataWidget(
       expanded: Container(
           padding: const EdgeInsets.all(18),
           color: Color.fromARGB(255, 239, 239, 239),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Access protocol: ${isPACE ? "PACE" : "BAC"}',
-                  //style: TextStyle(fontSize: 16.0),
-                ),
-                SizedBox(height: 8.0),
-                Text(
-                  'Access key type: ${isDBA ? "DBA" : "CAN"}',
-                  //style: TextStyle(fontSize: 16.0),
-                )
-              ])));
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(
+              'Access protocol: ${isPACE ? "PACE" : "BAC"}',
+              //style: TextStyle(fontSize: 16.0),
+            ),
+            SizedBox(height: 8.0),
+            Text(
+              'Access key type: ${isDBA ? "DBA" : "CAN"}',
+              //style: TextStyle(fontSize: 16.0),
+            )
+          ])));
 }
 
 String formatEfCom(final EfCOM efCom) {
@@ -130,20 +129,6 @@ String formatMRZ(final MRZ mrz) {
       "  date of expiry: ${DateFormat.yMd().format(mrz.dateOfExpiry)}\n" +
       "  add. data: ${mrz.optionalData}\n" +
       "  add. data: ${mrz.optionalData2}";
-}
-
-bool compareMRZ(MRZ mrz1, MRZ mrz2) {
-  return mrz1.documentNumber == mrz2.documentNumber &&
-         mrz1.dateOfBirth == mrz2.dateOfBirth &&
-         mrz1.dateOfExpiry == mrz2.dateOfExpiry &&
-         mrz1.documentCode == mrz2.documentCode &&
-         mrz1.country == mrz2.country &&
-         mrz1.nationality == mrz2.nationality &&
-         mrz1.firstName == mrz2.firstName &&
-         mrz1.lastName == mrz2.lastName &&
-         mrz1.gender == mrz2.gender &&
-         mrz1.optionalData == mrz2.optionalData &&
-         mrz1.optionalData2 == mrz2.optionalData2;
 }
 
 String formatDG15(final EfDG15 dg15) {
@@ -309,49 +294,48 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   }
 
   void _buttonPressed() async {
-      print("Button pressed");
-      //Check on what tab we are
-      if (_tabController.index == 0) {
-          //DBA tab
-          String errorText = "";
-          if (_doe.text.isEmpty) {
-            errorText += "Please enter date of expiry!\n";
-          }
-          if (_dob.text.isEmpty) {
-            errorText += "Please enter date of birth!\n";
-          }
-          if (_docNumber.text.isEmpty) {
-            errorText += "Please enter passport number!";
-          }
-
-          setState(() {
-            _alertMessage = errorText;
-          });
-          //If there is an error, just jump out of the function
-          if (errorText.isNotEmpty) return;
-
-          final bacKeySeed = DBAKey(_docNumber.text, _getDOBDate()!, _getDOEDate()!, paceMode: _checkBoxPACE);
-          _readMRTD(accessKey: bacKeySeed, isPace: _checkBoxPACE);
-      } else {
-        //PACE tab
-        String errorText = "";
-        if (_can.text.isEmpty) {
-            errorText = "Please enter CAN number!";
-        }
-        else if (_can.text.length != 6) {
-          errorText = "CAN number must be exactly 6 digits long!";
-        }
-
-        setState(() {
-          _alertMessage = errorText;
-        });
-        //If there is an error, just jump out of the function
-        if (errorText.isNotEmpty) return;
-
-        final canKeySeed = CanKey(_can.text);
-        _readMRTD(accessKey: canKeySeed, isPace: true);
+    print("Button pressed");
+    //Check on what tab we are
+    if (_tabController.index == 0) {
+      //DBA tab
+      String errorText = "";
+      if (_doe.text.isEmpty) {
+        errorText += "Please enter date of expiry!\n";
+      }
+      if (_dob.text.isEmpty) {
+        errorText += "Please enter date of birth!\n";
+      }
+      if (_docNumber.text.isEmpty) {
+        errorText += "Please enter passport number!";
       }
 
+      setState(() {
+        _alertMessage = errorText;
+      });
+      //If there is an error, just jump out of the function
+      if (errorText.isNotEmpty) return;
+
+      final bacKeySeed = DBAKey(_docNumber.text, _getDOBDate()!, _getDOEDate()!,
+          paceMode: _checkBoxPACE);
+      _readMRTD(accessKey: bacKeySeed, isPace: _checkBoxPACE);
+    } else {
+      //PACE tab
+      String errorText = "";
+      if (_can.text.isEmpty) {
+        errorText = "Please enter CAN number!";
+      } else if (_can.text.length != 6) {
+        errorText = "CAN number must be exactly 6 digits long!";
+      }
+
+      setState(() {
+        _alertMessage = errorText;
+      });
+      //If there is an error, just jump out of the function
+      if (errorText.isNotEmpty) return;
+
+      final canKeySeed = CanKey(_can.text);
+      _readMRTD(accessKey: canKeySeed, isPace: true);
+    }
   }
 
   void _readMRTD({required AccessKey accessKey, bool isPace = false}) async {
@@ -420,13 +404,15 @@ class _MrtdHomePageState extends State<MrtdHomePage>
               _dg2ImageBytes = mrtdData.dg2?.imageData;
             } else if (mrtdData.dg2?.imageType == ImageType.jpeg2000) {
               try {
-                final dynamic decoded = await const MethodChannel('dmrtd/image_decoder')
-                    .invokeMethod('decodeJp2k', {
+                final dynamic decoded =
+                    await const MethodChannel('dmrtd/image_decoder')
+                        .invokeMethod('decodeJp2k', {
                   'bytes': mrtdData.dg2!.imageData!,
                 });
                 _dg2ImageBytes = decoded as Uint8List?;
               } catch (e) {
-                _log.warning("Failed to decode JP2K image for face matching: $e");
+                _log.warning(
+                    "Failed to decode JP2K image for face matching: $e");
               }
             }
           }
@@ -777,8 +763,8 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   Widget _buildMatchRow(String label, bool isMatch) {
     return Row(
       children: [
-        Icon(isMatch ? Icons.check_circle : Icons.cancel, 
-             color: isMatch ? Colors.green : Colors.red, size: 16),
+        Icon(isMatch ? Icons.check_circle : Icons.cancel,
+            color: isMatch ? Colors.green : Colors.red, size: 16),
         SizedBox(width: 8),
         Text(label, style: TextStyle(fontSize: 14)),
       ],
@@ -798,14 +784,23 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     bool optMatch = mrz1.optionalData == mrz2.optionalData;
     bool opt2Match = mrz1.optionalData2 == mrz2.optionalData2;
 
-    bool allMatch = docNumMatch && dobMatch && doeMatch && codeMatch &&
-                    countryMatch && natMatch && firstMatch && lastMatch &&
-                    genderMatch && optMatch && opt2Match;
+    bool allMatch = docNumMatch &&
+        dobMatch &&
+        doeMatch &&
+        codeMatch &&
+        countryMatch &&
+        natMatch &&
+        firstMatch &&
+        lastMatch &&
+        genderMatch &&
+        optMatch &&
+        opt2Match;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('MRZ vs DG1 Comparison', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text('MRZ vs DG1 Comparison',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         SizedBox(height: 8),
         _buildMatchRow('Document Number', docNumMatch),
         _buildMatchRow('Date of Birth', dobMatch),
@@ -895,31 +890,17 @@ class _MrtdHomePageState extends State<MrtdHomePage>
         if (_mrtdData!.dg2!.imageType == ImageType.jpeg) {
           imageWidget = Image.memory(_mrtdData!.dg2!.imageData!);
         } else if (_mrtdData!.dg2!.imageType == ImageType.jpeg2000) {
-          imageWidget = FutureBuilder<dynamic>(
-            future: const MethodChannel('dmrtd/image_decoder').invokeMethod('decodeJp2k', {
-              'bytes': _mrtdData!.dg2!.imageData!,
-            }),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.only(bottom: 8.0),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              } else if (snapshot.hasError) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    'Error decoding JP2K image: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                );
-              } else if (snapshot.hasData) {
-                return Image.memory(snapshot.data as Uint8List);
-              } else {
-                return const SizedBox.shrink();
-              }
-            },
-          );
+          if (_dg2ImageBytes != null) {
+            imageWidget = Image.memory(_dg2ImageBytes!);
+          } else {
+            imageWidget = const Padding(
+              padding: EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                'Failed to decode JP2K image',
+                style: TextStyle(color: Colors.red),
+              ),
+            );
+          }
         } else {
           imageWidget = const Padding(
             padding: EdgeInsets.only(bottom: 8.0),
@@ -1066,15 +1047,18 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                                 final result = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const MrzScannerScreen(),
+                                    builder: (context) =>
+                                        const MrzScannerScreen(),
                                   ),
                                 );
                                 if (result != null && result is MRZ) {
                                   setState(() {
                                     _scannedMRZ = result;
                                     _docNumber.text = result.documentNumber;
-                                    _dob.text = DateFormat.yMd().format(result.dateOfBirth);
-                                    _doe.text = DateFormat.yMd().format(result.dateOfExpiry);
+                                    _dob.text = DateFormat.yMd()
+                                        .format(result.dateOfBirth);
+                                    _doe.text = DateFormat.yMd()
+                                        .format(result.dateOfExpiry);
                                   });
                                 }
                               },
@@ -1088,8 +1072,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                                   _isReading ? 'Reading ...' : 'Read Passport'),
                             ),
                             // ── Verify Face button ─────────────────────────────
-                            if (_dg2ImageBytes != null) ...
-                            [
+                            if (_dg2ImageBytes != null) ...[
                               SizedBox(height: 12),
                               PlatformElevatedButton(
                                 onPressed: _launchFaceVerification,
@@ -1149,17 +1132,14 @@ class _MrtdHomePageState extends State<MrtdHomePage>
       ),
       Container(
           height: 350,
-          child: TabBarView(controller: _tabController,
-
-              children: <Widget>[
+          child: TabBarView(controller: _tabController, children: <Widget>[
             Card(
-          borderOnForeground: false,
+              borderOnForeground: false,
               elevation: 0,
               color: Colors.white,
               //shadowColor: Colors.white,
               margin: const EdgeInsets.all(16.0),
               child: Form(
-
                 key: _mrzData,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1259,47 +1239,46 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                         });
                       },
                     )
-
                   ],
-                 ),
+                ),
               ),
             ),
-                Card(
-                  borderOnForeground: false,
-                  elevation: 0,
-                  color: Colors.white,
-                  //shadowColor: Colors.white,
-                  margin: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _canData,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        TextFormField(
-                          enabled: !_disabledInput(),
-                          controller: _can,
-                          decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              labelText: 'CAN number',
-                              fillColor: Colors.white),
-                          inputFormatters: <TextInputFormatter>[
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9]+')),
-                            LengthLimitingTextInputFormatter(6)
-                          ],
-                          textInputAction: TextInputAction.done,
-                          textCapitalization: TextCapitalization.characters,
-                          autofocus: true,
-                          validator: (value) {
-                            if (value?.isEmpty ?? false) {
-                              return 'Please enter CAN number';
-                            }
-                            return null;
-                          },
-                        ),
+            Card(
+              borderOnForeground: false,
+              elevation: 0,
+              color: Colors.white,
+              //shadowColor: Colors.white,
+              margin: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _canData,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    TextFormField(
+                      enabled: !_disabledInput(),
+                      controller: _can,
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'CAN number',
+                          fillColor: Colors.white),
+                      inputFormatters: <TextInputFormatter>[
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9]+')),
+                        LengthLimitingTextInputFormatter(6)
                       ],
+                      textInputAction: TextInputAction.done,
+                      textCapitalization: TextCapitalization.characters,
+                      autofocus: true,
+                      validator: (value) {
+                        if (value?.isEmpty ?? false) {
+                          return 'Please enter CAN number';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                )
+                  ],
+                ),
+              ),
+            )
           ]))
     ]);
   }
