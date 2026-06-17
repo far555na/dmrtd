@@ -514,6 +514,25 @@ class _MrtdHomePageState extends State<MrtdHomePage>
             if (mrtdData.dg16 != null) providedDGs[16] = mrtdData.dg16!.toBytes();
             
             _paResult = PassiveAuthenticationService.verifyDataGroupHashes(_sodParseResult!, providedDGs);
+
+            // Phase 4: SOD Signature Verification
+            bool isSignatureValid = false;
+            String signatureError = '';
+            try {
+              isSignatureValid = PassiveAuthenticationService.verifySODSignature(_sodParseResult!);
+            } catch (e) {
+              signatureError = e.toString();
+              _log.warning('SOD signature verification error: $e');
+            }
+            // Rebuild _paResult with the real isSignatureValid
+            _paResult = PassiveAuthenticationResult(
+              dataGroupMatches: _paResult!.dataGroupMatches,
+              unreadDataGroups: _paResult!.unreadDataGroups,
+              isSignatureValid: isSignatureValid,
+              isTrustChainValid: _paResult!.isTrustChainValid,
+              revocationStatus: _paResult!.revocationStatus,
+              signatureError: signatureError,
+            );
           }
         } catch (e) {
           _log.severe("Failed to parse SOD or verify hashes for Phase 2/3: $e");
@@ -917,6 +936,26 @@ class _MrtdHomePageState extends State<MrtdHomePage>
                 ),
                 ..._paResult!.unreadDataGroups.map((dg) => 
                    Text('DG$dg -> Unread ⚠️')
+                ),
+                SizedBox(height: 16),
+                Text('Phase 4 Debug Info (SOD Signature):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      _paResult!.isSignatureValid ? Icons.verified_user : Icons.gpp_bad,
+                      color: _paResult!.isSignatureValid ? Colors.green : Colors.red,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'SOD Signature Validated: ${_paResult!.isSignatureValid ? '✅' : '❌'}'
+                        '${_paResult!.signatureError.isNotEmpty ? '\nError: ${_paResult!.signatureError}' : ''}',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
