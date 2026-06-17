@@ -22,6 +22,8 @@ import 'package:dmrtd/src/proto/ecdh_pace.dart';
 import 'mrz_scanner_screen.dart';
 import 'selfie_capture_screen.dart';
 import 'face_verification_screen.dart';
+import 'services/passive_authentication_service.dart';
+import 'services/passive_authentication_trust_store.dart';
 
 class MrtdData {
   EfCardAccess? cardAccess;
@@ -215,6 +217,10 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   MRZ? _scannedMRZ;
   // Cached DG2 image bytes for face verification (JPEG or decoded JPEG).
   Uint8List? _dg2ImageBytes;
+  
+  // Phase 2: SOD Parse Result
+  SodParseResult? _sodParseResult;
+  PassiveAuthenticationTrustStore _trustStore = PassiveAuthenticationTrustStore();
 
   final NfcProvider _nfc = NfcProvider();
 
@@ -342,6 +348,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     try {
       setState(() {
         _mrtdData = null;
+        _sodParseResult = null;
         _alertMessage = "Waiting for Passport tag ...";
         _isReading = true;
       });
@@ -480,6 +487,14 @@ class _MrtdHomePageState extends State<MrtdHomePage>
         _nfc.setIosAlertMessage(formatProgressMsg("Reading EF.SOD ...", 80));
         mrtdData.sod = await passport.readEfSOD();
 
+        try {
+          if (mrtdData.sod != null) {
+            _sodParseResult = PassiveAuthenticationService.parseSOD(mrtdData.sod!.toBytes());
+          }
+        } catch (e) {
+          _log.severe("Failed to parse SOD for Phase 2: $e");
+        }
+
         setState(() {
           _mrtdData = mrtdData;
         });
@@ -560,6 +575,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     try {
       setState(() {
         _mrtdData = null;
+        _sodParseResult = null;
         _alertMessage = "Waiting for Passport tag ...";
         _isReading = true;
       });
@@ -854,10 +870,29 @@ class _MrtdHomePageState extends State<MrtdHomePage>
     }
 
     if (_mrtdData!.sod != null) {
+      Widget? extraWidget;
+      if (_sodParseResult != null) {
+        extraWidget = Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Phase 2 Debug Info:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              SizedBox(height: 8),
+              Text('Hash Alg OID: ${_sodParseResult!.hashAlgorithmOid}'),
+              Text('Number of DGs in SOD: ${_sodParseResult!.dataGroupHashes.length}'),
+              Text('DSC Subject: ${_sodParseResult!.dscCertificate.tbsCertificate?.subject}'),
+              Text('Loaded CSCA Certs: 0 (Stubbed for now)'),
+            ],
+          ),
+        );
+      }
+
       list.add(_makeMrtdDataWidget(
           header: 'EF.SOD',
           collapsedText: '',
-          dataText: _mrtdData!.sod!.toBytes().hex()));
+          dataText: _mrtdData!.sod!.toBytes().hex(),
+          extraWidget: extraWidget));
     }
 
     if (_mrtdData!.com != null) {
