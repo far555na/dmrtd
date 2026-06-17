@@ -41,3 +41,9 @@ lib/generated_plugin_registrant.dart
 ._*
 
 *.zip
+
+# Local passive authentication work
+doc/
+doc/**
+example/lib/services/passive_authentication_result.dart
+example/lib/services/passive_authentication_trust_store.dart
