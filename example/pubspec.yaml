@@ -39,7 +39,10 @@ dependencies:
   google_mlkit_face_detection: ^0.13.2
   tflite_flutter: ^0.12.1
   image: ^4.3.0
-
+  basic_utils: ^5.7.0
+  pointycastle: ^3.9.1
+  crypto: ^3.0.6
+  collection: ^1.19.0
 dev_dependencies:
   flutter_lints: ^2.0.1
   flutter_test:
