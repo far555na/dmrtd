@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:basic_utils/basic_utils.dart';
 import 'package:pointycastle/asn1.dart';
 import 'package:dmrtd/dmrtd.dart';
-
+import 'package:crypto/crypto.dart';
+import 'package:collection/collection.dart';
+import 'passive_authentication_result.dart';
 class SodParseResult {
   final String hashAlgorithmOid;
   final Map<int, Uint8List> dataGroupHashes;
@@ -179,6 +181,61 @@ class PassiveAuthenticationService {
       signatureBytes: signatureOctetString.valueBytes!,
       signedAttributes: signedAttributesBytes,
       encapContentInfoBytes: ldsSecurityObjectBytes,
+    );
+  }
+
+  /// Verifies the hashes of provided Data Groups against the hashes stored in the SOD.
+  static PassiveAuthenticationResult verifyDataGroupHashes(
+      SodParseResult sodParseResult, Map<int, Uint8List> providedDGs) {
+    Hash algorithm;
+    switch (sodParseResult.hashAlgorithmOid) {
+      case '1.3.14.3.2.26':
+        algorithm = sha1;
+        break;
+      case '2.16.840.1.101.3.4.2.1':
+        algorithm = sha256;
+        break;
+      case '2.16.840.1.101.3.4.2.2':
+        algorithm = sha384;
+        break;
+      case '2.16.840.1.101.3.4.2.3':
+        algorithm = sha512;
+        break;
+      default:
+        throw Exception('Unsupported hash algorithm OID: \${sodParseResult.hashAlgorithmOid}');
+    }
+
+    final Map<int, bool> dataGroupMatches = {};
+    final List<int> unreadDataGroups = [];
+
+    // Find unread DGs
+    for (var dgNumber in sodParseResult.dataGroupHashes.keys) {
+      if (!providedDGs.containsKey(dgNumber)) {
+        unreadDataGroups.add(dgNumber);
+      }
+    }
+
+    // Verify provided DGs
+    final eq = const ListEquality<int>();
+    for (var entry in providedDGs.entries) {
+      final dgNumber = entry.key;
+      final dgBytes = entry.value;
+
+      if (sodParseResult.dataGroupHashes.containsKey(dgNumber)) {
+        final expectedHash = sodParseResult.dataGroupHashes[dgNumber]!;
+        final actualHash = algorithm.convert(dgBytes).bytes;
+        dataGroupMatches[dgNumber] = eq.equals(expectedHash, actualHash);
+      } else {
+        // DG provided but not in SOD
+        dataGroupMatches[dgNumber] = false;
+      }
+    }
+
+    return PassiveAuthenticationResult(
+      dataGroupMatches: dataGroupMatches,
+      unreadDataGroups: unreadDataGroups,
+      isSignatureValid: false, // Phase 4 stub
+      isTrustChainValid: false, // Phase 5 stub
     );
   }
 }

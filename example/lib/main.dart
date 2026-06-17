@@ -24,6 +24,7 @@ import 'selfie_capture_screen.dart';
 import 'face_verification_screen.dart';
 import 'services/passive_authentication_service.dart';
 import 'services/passive_authentication_trust_store.dart';
+import 'services/passive_authentication_result.dart';
 
 class MrtdData {
   EfCardAccess? cardAccess;
@@ -220,6 +221,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
   
   // Phase 2: SOD Parse Result
   SodParseResult? _sodParseResult;
+  PassiveAuthenticationResult? _paResult;
   PassiveAuthenticationTrustStore _trustStore = PassiveAuthenticationTrustStore();
 
   final NfcProvider _nfc = NfcProvider();
@@ -349,6 +351,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
       setState(() {
         _mrtdData = null;
         _sodParseResult = null;
+        _paResult = null;
         _alertMessage = "Waiting for Passport tag ...";
         _isReading = true;
       });
@@ -490,9 +493,30 @@ class _MrtdHomePageState extends State<MrtdHomePage>
         try {
           if (mrtdData.sod != null) {
             _sodParseResult = PassiveAuthenticationService.parseSOD(mrtdData.sod!.toBytes());
+
+            // Phase 3: Hash Verification
+            Map<int, Uint8List> providedDGs = {};
+            if (mrtdData.dg1 != null) providedDGs[1] = mrtdData.dg1!.toBytes();
+            if (mrtdData.dg2 != null) providedDGs[2] = mrtdData.dg2!.toBytes();
+            if (mrtdData.dg3 != null) providedDGs[3] = mrtdData.dg3!.toBytes();
+            if (mrtdData.dg4 != null) providedDGs[4] = mrtdData.dg4!.toBytes();
+            if (mrtdData.dg5 != null) providedDGs[5] = mrtdData.dg5!.toBytes();
+            if (mrtdData.dg6 != null) providedDGs[6] = mrtdData.dg6!.toBytes();
+            if (mrtdData.dg7 != null) providedDGs[7] = mrtdData.dg7!.toBytes();
+            if (mrtdData.dg8 != null) providedDGs[8] = mrtdData.dg8!.toBytes();
+            if (mrtdData.dg9 != null) providedDGs[9] = mrtdData.dg9!.toBytes();
+            if (mrtdData.dg10 != null) providedDGs[10] = mrtdData.dg10!.toBytes();
+            if (mrtdData.dg11 != null) providedDGs[11] = mrtdData.dg11!.toBytes();
+            if (mrtdData.dg12 != null) providedDGs[12] = mrtdData.dg12!.toBytes();
+            if (mrtdData.dg13 != null) providedDGs[13] = mrtdData.dg13!.toBytes();
+            if (mrtdData.dg14 != null) providedDGs[14] = mrtdData.dg14!.toBytes();
+            if (mrtdData.dg15 != null) providedDGs[15] = mrtdData.dg15!.toBytes();
+            if (mrtdData.dg16 != null) providedDGs[16] = mrtdData.dg16!.toBytes();
+            
+            _paResult = PassiveAuthenticationService.verifyDataGroupHashes(_sodParseResult!, providedDGs);
           }
         } catch (e) {
-          _log.severe("Failed to parse SOD for Phase 2: $e");
+          _log.severe("Failed to parse SOD or verify hashes for Phase 2/3: $e");
         }
 
         setState(() {
@@ -576,6 +600,7 @@ class _MrtdHomePageState extends State<MrtdHomePage>
       setState(() {
         _mrtdData = null;
         _sodParseResult = null;
+        _paResult = null;
         _alertMessage = "Waiting for Passport tag ...";
         _isReading = true;
       });
@@ -883,6 +908,17 @@ class _MrtdHomePageState extends State<MrtdHomePage>
               Text('Number of DGs in SOD: ${_sodParseResult!.dataGroupHashes.length}'),
               Text('DSC Subject: ${_sodParseResult!.dscCertificate.tbsCertificate?.subject}'),
               Text('Loaded CSCA Certs: 0 (Stubbed for now)'),
+              if (_paResult != null) ...[
+                SizedBox(height: 16),
+                Text('Phase 3 Debug Info (Hashes):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                SizedBox(height: 8),
+                ..._paResult!.dataGroupMatches.entries.map((e) => 
+                   Text('DG${e.key} -> Hash Matched ${e.value ? '✅' : '❌'}')
+                ),
+                ..._paResult!.unreadDataGroups.map((dg) => 
+                   Text('DG$dg -> Unread ⚠️')
+                ),
+              ],
             ],
           ),
         );
